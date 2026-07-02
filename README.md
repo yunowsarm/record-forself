@@ -95,6 +95,23 @@ src/
 pnpm update chinese-workday
 ```
 
+## Netlify 部署
+
+Vite 会在**构建时**把环境变量打进前端包，`.env.local` 不会上传到 Git，必须在 Netlify 后台单独配置。
+
+1. 打开 [Netlify](https://app.netlify.com/) → 你的站点 → **Site configuration** → **Environment variables**
+2. 添加（与本地 `.env.local` 相同）：
+
+| Key | Value |
+|-----|--------|
+| `VITE_SUPABASE_URL` | `https://bobvfaovainhjjmwqncg.supabase.co`（你的项目 URL） |
+| `VITE_SUPABASE_PUBLISHABLE_KEY` | Supabase Dashboard → API → Publishable key |
+
+3. **Deploys** → **Trigger deploy** → **Deploy site**（必须重新部署，仅改变量不会更新已构建的 JS）
+4. 构建命令与发布目录见根目录 [`netlify.toml`](netlify.toml)：`pnpm build`，发布 `dist`
+
+`public/_redirects` 已包含 SPA 回退，刷新子路由不会 404。
+
 ## 安全说明
 
 - 前端仅使用 **Publishable key**（或 legacy anon key），不可暴露 `service_role` key
