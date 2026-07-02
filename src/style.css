@@ -195,12 +195,13 @@ a:hover {
   }
 }
 
-/* Element Plus loading: center spinner, no mask background */
+/* Element Plus loading: centered spinner + light overlay */
 .el-loading-mask {
   display: flex;
   align-items: center;
   justify-content: center;
-  background-color: transparent !important;
+  background-color: rgba(245, 247, 251, 0.72) !important;
+  backdrop-filter: blur(2px);
 }
 
 .el-loading-mask .el-loading-spinner {

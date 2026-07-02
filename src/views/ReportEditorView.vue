@@ -5,12 +5,15 @@ import { ElMessage } from 'element-plus'
 import { useReports } from '@/composables/useReports'
 import type { ReportFormData, ReportStatus } from '@/types/report'
 import {
+  formatWeekLabel,
   getCurrentWeekRange,
   validateReportWeek,
   getBackfillWeekOptions,
+  getWeekWorkSummary,
   type WeekOption,
 } from '@/utils/week'
-import WeekRangeDisplay from '@/components/WeekRangeDisplay.vue'
+import { isValidDateString } from '@/lib/work-calendar'
+import WeekPeriodSelect from '@/components/WeekPeriodSelect.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -33,6 +36,12 @@ const pageTitle = computed(() => {
   return '填写本周周报'
 })
 
+const pageSubtitle = computed(() => {
+  if (isEdit.value) return '填写本周工作内容，回顾进展并规划下一步'
+  if (editorMode.value === 'backfill') return '可选择历史周补录，不可提前录入未来周'
+  return '仅可填写当前周，往期请使用补录'
+})
+
 const selectedWeekStart = ref('')
 const form = ref<ReportFormData>({
   week_start: '',
@@ -48,15 +57,18 @@ const loading = ref(false)
 const saving = ref(false)
 const backfillOptions = ref<WeekOption[]>([])
 
+const weekPeriodSummary = computed(() => {
+  if (!isValidDateString(form.value.week_start) || !isValidDateString(form.value.week_end)) {
+    return null
+  }
+  return getWeekWorkSummary(form.value.week_start, form.value.week_end)
+})
+
 function applyWeekRange(weekStart: string, weekEnd: string) {
   selectedWeekStart.value = weekStart
   form.value.week_start = weekStart
   form.value.week_end = weekEnd
 }
-
-const selectedBackfillOption = computed(() =>
-  backfillOptions.value.find((o) => o.weekStart === selectedWeekStart.value),
-)
 
 function onBackfillChange(weekStart: string) {
   const option = backfillOptions.value.find((o) => o.weekStart === weekStart)
@@ -139,216 +151,385 @@ onMounted(() => {
 </script>
 
 <template>
-  <div v-loading="loading" class="u-page editor">
-    <header class="u-page-header">
-      <div>
-        <h2 class="u-page-title">{{ pageTitle }}</h2>
-        <p v-if="editorMode === 'current'" class="u-page-subtitle">
-          仅可填写当前周，往期请使用补录
-        </p>
-        <p v-else-if="editorMode === 'backfill'" class="u-page-subtitle">
-          可选择历史周补录，不可提前录入未来周
-        </p>
-      </div>
-      <el-button @click="router.back()">返回</el-button>
-    </header>
+  <div v-loading="loading" class="weekly-report-edit-page">
+    <main class="weekly-report-edit-page__main">
+      <section class="page-title-section">
+        <div class="page-title-section__head">
+          <div class="page-title-section__text">
+            <h2 class="page-title-section__title">{{ pageTitle }}</h2>
+            <p class="page-title-section__desc">{{ pageSubtitle }}</p>
+          </div>
+          <button type="button" class="btn-back" @click="router.back()">返回</button>
+        </div>
+      </section>
 
-    <div class="u-card editor__card">
-      <div class="u-card-body u-stack">
-        <section v-if="editorMode === 'current' || isEdit" class="editor__week">
-          <label class="editor__label">报告周期</label>
-          <WeekRangeDisplay
-            v-if="form.week_start && form.week_end"
-            :week-start="form.week_start"
-            :week-end="form.week_end"
-            show-hint
-          />
-        </section>
+      <section class="period-card">
+        <div class="period-card__body">
+          <template v-if="editorMode === 'backfill'">
+            <p class="period-card__label">选择补录周期</p>
+            <WeekPeriodSelect
+              v-model="selectedWeekStart"
+              :options="backfillOptions"
+              placeholder="选择历史周"
+              class="period-card__select"
+              @change="onBackfillChange"
+            />
+          </template>
+          <template v-else>
+            <p class="period-card__label">报告周期</p>
+          </template>
 
-        <section v-else-if="editorMode === 'backfill'" class="editor__week">
-          <label class="editor__label">选择补录周期</label>
-          <el-select
-            v-model="selectedWeekStart"
-            placeholder="选择历史周"
-            filterable
-            fit-input-width
-            class="backfill-select"
-            popper-class="backfill-week-popper"
-            @change="onBackfillChange"
-          >
-            <template v-if="selectedBackfillOption" #label>
-              <div class="week-opt week-opt--selected">
-                <span class="week-opt__title">{{ selectedBackfillOption.workDayTitle }}</span>
-                <span class="week-opt__detail">{{ selectedBackfillOption.workDayDetail }}</span>
-              </div>
-            </template>
-            <el-option
-              v-for="opt in backfillOptions"
-              :key="opt.weekStart"
-              :label="opt.label"
-              :value="opt.weekStart"
+          <template v-if="weekPeriodSummary">
+            <p class="period-card__range">
+              {{ formatWeekLabel(form.week_start, form.week_end) }}
+            </p>
+            <p class="period-card__meta">
+              {{ weekPeriodSummary.label }} ｜ {{ weekPeriodSummary.hint }}
+            </p>
+            <div
+              v-if="weekPeriodSummary.holidays.length || weekPeriodSummary.adjustedWorkdays.length"
+              class="period-card__tags"
             >
-              <div class="week-opt">
-                <span class="week-opt__title">{{ opt.workDayTitle }}</span>
-                <span class="week-opt__detail">{{ opt.workDayDetail }}</span>
-              </div>
-            </el-option>
-          </el-select>
-          <WeekRangeDisplay
-            v-if="form.week_start"
-            :week-start="form.week_start"
-            :week-end="form.week_end"
-            show-hint
+              <span
+                v-for="h in weekPeriodSummary.holidays"
+                :key="h.date"
+                class="period-card__tag period-card__tag--off"
+              >
+                {{ h.date.slice(5) }} {{ h.name }}
+              </span>
+              <span
+                v-for="w in weekPeriodSummary.adjustedWorkdays"
+                :key="w.date"
+                class="period-card__tag period-card__tag--work"
+              >
+                {{ w.date.slice(5) }} 调休
+              </span>
+            </div>
+          </template>
+        </div>
+      </section>
+
+      <div class="form-section-list">
+        <section class="form-card">
+          <div class="form-card__head">
+            <label class="form-card__label" for="completed-work">
+              本周完成
+              <span class="form-card__required">*</span>
+            </label>
+          </div>
+          <textarea
+            id="completed-work"
+            v-model="form.completed_work"
+            class="form-card__textarea form-card__textarea--lg"
+            placeholder="列出本周已完成的工作"
+            rows="5"
           />
         </section>
 
-        <hr class="u-divider" />
+        <section class="form-card">
+          <div class="form-card__head">
+            <label class="form-card__label" for="in-progress">进行中</label>
+          </div>
+          <textarea
+            id="in-progress"
+            v-model="form.in_progress"
+            class="form-card__textarea"
+            placeholder="正在进行的工作"
+            rows="4"
+          />
+        </section>
 
-        <el-form label-position="top" class="editor__form">
-          <el-form-item label="本周完成" required>
-            <el-input
-              v-model="form.completed_work"
-              type="textarea"
-              :rows="4"
-              placeholder="列出本周已完成的工作"
-            />
-          </el-form-item>
+        <section class="form-card">
+          <div class="form-card__head">
+            <label class="form-card__label" for="next-week-plan">下周计划</label>
+          </div>
+          <textarea
+            id="next-week-plan"
+            v-model="form.next_week_plan"
+            class="form-card__textarea"
+            placeholder="下周工作计划"
+            rows="4"
+          />
+        </section>
 
-          <el-form-item label="进行中">
-            <el-input
-              v-model="form.in_progress"
-              type="textarea"
-              :rows="3"
-              placeholder="正在进行的工作"
-            />
-          </el-form-item>
-
-          <el-form-item label="下周计划">
-            <el-input
-              v-model="form.next_week_plan"
-              type="textarea"
-              :rows="3"
-              placeholder="下周工作计划"
-            />
-          </el-form-item>
-
-          <el-form-item label="问题与风险">
-            <el-input
-              v-model="form.issues"
-              type="textarea"
-              :rows="2"
-              placeholder="可选，遇到的阻碍或风险"
-            />
-          </el-form-item>
-        </el-form>
+        <section class="form-card">
+          <div class="form-card__head">
+            <label class="form-card__label" for="issues">问题与风险</label>
+          </div>
+          <textarea
+            id="issues"
+            v-model="form.issues"
+            class="form-card__textarea form-card__textarea--sm"
+            placeholder="可选，遇到的阻碍或风险"
+            rows="3"
+          />
+        </section>
       </div>
+    </main>
 
-      <div class="editor__footer">
-        <el-button :loading="saving" @click="save('draft')">保存草稿</el-button>
-        <el-button type="primary" :loading="saving" @click="save('published')">发布</el-button>
-      </div>
-    </div>
+    <footer class="bottom-action-bar">
+      <button
+        type="button"
+        class="bottom-action-bar__btn bottom-action-bar__btn--outline"
+        :disabled="saving"
+        @click="save('draft')"
+      >
+        {{ saving ? '保存中...' : '保存草稿' }}
+      </button>
+      <button
+        type="button"
+        class="bottom-action-bar__btn bottom-action-bar__btn--primary"
+        :disabled="saving"
+        @click="save('published')"
+      >
+        {{ saving ? '提交中...' : '发布周报' }}
+      </button>
+    </footer>
   </div>
 </template>
 
 <style scoped>
-.editor__card {
-  overflow: hidden;
+.weekly-report-edit-page {
+  --edit-primary: #2f6bff;
+  --edit-primary-soft: rgba(47, 107, 255, 0.12);
+  --edit-text: #101828;
+  --edit-body: #475467;
+  --edit-muted: #667085;
+  --edit-border: #e4e7ec;
+  --edit-input-border: #d0d5dd;
+
+  min-height: calc(100vh - 56px - 32px);
+  display: flex;
+  flex-direction: column;
+  margin: 0 -16px;
+  padding-bottom: 88px;
 }
 
-.editor__label {
+.weekly-report-edit-page__main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 0 16px;
+}
+
+.page-title-section__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.page-title-section__title {
+  margin: 0;
+  font-size: 26px;
+  font-weight: 700;
+  color: var(--edit-text);
+  letter-spacing: -0.02em;
+  line-height: 1.25;
+}
+
+.page-title-section__desc {
+  margin: 8px 0 0;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--edit-muted);
+}
+
+.btn-back {
+  flex-shrink: 0;
+  height: 40px;
+  padding: 0 14px;
+  border: 1px solid var(--edit-border);
+  border-radius: 10px;
+  background: #fff;
+  color: var(--edit-primary);
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.btn-back:active {
+  background: #f9fafb;
+}
+
+.period-card {
+  background: #fff;
+  border-radius: 14px;
+  box-shadow: 0 4px 12px rgba(16, 24, 40, 0.06);
+  border: 1px solid var(--edit-border);
+}
+
+.period-card__body {
+  padding: 20px;
+}
+
+.period-card__label {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--edit-muted);
+}
+
+.period-card__select {
+  margin-top: 10px;
+}
+
+.period-card__range {
+  margin: 8px 0 0;
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--edit-text);
+  line-height: 1.35;
+}
+
+.period-card__select + .period-card__range {
+  margin-top: 14px;
+}
+
+.period-card__meta {
+  margin: 8px 0 0;
+  font-size: 14px;
+  color: var(--edit-body);
+  line-height: 1.5;
+}
+
+.period-card__tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.period-card__tag {
+  font-size: 12px;
+  padding: 2px 8px;
+  border-radius: 6px;
+  border: 1px solid var(--edit-border);
+}
+
+.period-card__tag--off {
+  color: #b45309;
+  background: #fffbeb;
+  border-color: #fde68a;
+}
+
+.period-card__tag--work {
+  color: var(--edit-primary);
+  background: var(--edit-primary-soft);
+  border-color: #bfdbfe;
+}
+
+.form-section-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.form-card {
+  background: #fff;
+  border-radius: 14px;
+  padding: 16px;
+  border: 1px solid var(--edit-border);
+  box-shadow: 0 2px 8px rgba(16, 24, 40, 0.04);
+}
+
+.form-card__head {
+  margin-bottom: 10px;
+}
+
+.form-card__label {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--edit-text);
+}
+
+.form-card__required {
+  color: #f04438;
+  margin-left: 2px;
+}
+
+.form-card__textarea {
   display: block;
-  font-size: var(--font-sm);
-  font-weight: 500;
-  color: var(--color-text-secondary);
-  margin-bottom: var(--space-2);
-}
-
-.editor__week {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-3);
-}
-
-.editor__form :deep(.el-form-item__label) {
-  font-weight: 500;
-  color: var(--color-text-secondary);
-}
-
-.editor__footer {
-  display: flex;
-  justify-content: flex-end;
-  gap: var(--space-3);
-  padding: var(--space-4) var(--space-5);
-  border-top: 1px solid var(--color-border);
-  background: #fafbfc;
-}
-
-@media (max-width: 768px) {
-  .editor__footer {
-    position: sticky;
-    bottom: 0;
-    padding: var(--space-3) var(--space-4);
-    box-shadow: 0 -2px 8px rgba(15, 23, 42, 0.06);
-  }
-
-  .editor__footer .el-button {
-    flex: 1;
-  }
-}
-
-.backfill-select {
   width: 100%;
+  min-height: 96px;
+  padding: 12px 14px;
+  border: 1px solid var(--edit-input-border);
+  border-radius: 10px;
+  font-size: 15px;
+  line-height: 1.7;
+  color: var(--edit-text);
+  background: #fff;
+  resize: vertical;
+  font-family: inherit;
+  box-sizing: border-box;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
 
-.backfill-select :deep(.el-select__wrapper) {
-  min-height: 52px;
-  height: auto;
-  padding-top: 6px;
-  padding-bottom: 6px;
+.form-card__textarea--lg {
+  min-height: 132px;
 }
 
-.week-opt {
+.form-card__textarea--sm {
+  min-height: 80px;
+}
+
+.form-card__textarea::placeholder {
+  color: #98a2b3;
+}
+
+.form-card__textarea:focus {
+  outline: none;
+  border-color: var(--edit-primary);
+  box-shadow: 0 0 0 3px var(--edit-primary-soft);
+}
+
+.bottom-action-bar {
+  position: fixed;
+  left: 50%;
+  bottom: 0;
+  transform: translateX(-50%);
+  width: 100%;
+  max-width: 480px;
   display: flex;
-  flex-direction: column;
-  gap: 2px;
-  padding: 2px 0;
-  line-height: 1.4;
-  min-width: 0;
-}
-
-.week-opt--selected {
-  padding: 0;
-}
-
-.week-opt__title {
-  font-size: var(--font-base);
-  font-weight: 500;
-  color: var(--color-text);
-}
-
-.week-opt__detail {
-  font-size: var(--font-xs);
-  color: var(--color-text-muted);
-  white-space: normal;
-  word-break: break-word;
-}
-</style>
-
-<style>
-.backfill-week-popper.el-select__popper {
+  gap: 12px;
+  padding: 12px 16px calc(12px + env(safe-area-inset-bottom, 0px));
+  background: #fff;
+  border-top: 1px solid var(--edit-border);
+  box-shadow: 0 -4px 12px rgba(16, 24, 40, 0.06);
+  z-index: 90;
   box-sizing: border-box;
 }
 
-.backfill-week-popper .el-select-dropdown__wrap {
-  max-width: 100%;
+.bottom-action-bar__btn {
+  flex: 1;
+  height: 46px;
+  border-radius: 12px;
+  font-size: 15px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: opacity 0.15s ease;
 }
 
-.backfill-week-popper .el-select-dropdown__item {
-  height: auto;
-  min-height: 48px;
-  padding: 10px 12px;
-  line-height: 1.4;
-  white-space: normal;
+.bottom-action-bar__btn:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+
+.bottom-action-bar__btn:active:not(:disabled) {
+  opacity: 0.88;
+}
+
+.bottom-action-bar__btn--outline {
+  border: 1px solid var(--edit-primary);
+  background: #fff;
+  color: var(--edit-primary);
+}
+
+.bottom-action-bar__btn--primary {
+  border: none;
+  background: var(--edit-primary);
+  color: #fff;
 }
 </style>

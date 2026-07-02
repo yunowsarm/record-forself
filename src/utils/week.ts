@@ -115,6 +115,12 @@ export function getBackfillWeekOptions(maxWeeks = 52, date = new Date()): WeekOp
   return options
 }
 
+/** 筛选用的周次列表（含当前周，按时间倒序） */
+export function getFilterWeekOptions(maxWeeks = 52, date = new Date()): WeekOption[] {
+  const current = getCurrentWeekRange(date)
+  return [buildWeekOption(current, true), ...getBackfillWeekOptions(maxWeeks, date)]
+}
+
 export function enumerateDays(weekStart: string, weekEnd: string): string[] {
   const days: string[] = []
   let cursor = parseDate(weekStart)

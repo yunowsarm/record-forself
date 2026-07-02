@@ -1,4 +1,5 @@
 export type ReportStatus = 'draft' | 'published'
+export type ReportListScope = 'mine' | 'all'
 
 export interface Profile {
   id: string
@@ -21,6 +22,10 @@ export interface WeeklyReport {
   updated_at: string
 }
 
+export interface WeeklyReportWithAuthor extends WeeklyReport {
+  author_name?: string
+}
+
 export interface ReportFormData {
   week_start: string
   week_end: string
@@ -35,3 +40,19 @@ export interface ReportFilters {
   year?: number
   status?: ReportStatus | ''
 }
+
+export interface ReportListFilters {
+  scope: ReportListScope
+  status?: ReportStatus | ''
+  userId?: string
+  dateFrom?: string
+  dateTo?: string
+}
+
+export interface PaginatedReports {
+  items: WeeklyReportWithAuthor[]
+  hasMore: boolean
+  total: number
+}
+
+export const REPORT_PAGE_SIZE = 5

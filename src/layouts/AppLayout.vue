@@ -17,8 +17,9 @@ async function handleLogout() {
       <div class="app-header__inner">
         <h1 class="app-header__logo">工作周报</h1>
         <div class="app-header__actions">
-          <span class="app-header__user u-text-muted">{{ profile?.display_name ?? '用户' }}</span>
-          <el-button size="small" @click="handleLogout">退出</el-button>
+          <span class="app-header__user">{{ profile?.display_name ?? '用户' }}</span>
+          <span class="app-header__sep">|</span>
+          <button type="button" class="app-header__logout" @click="handleLogout">退出</button>
         </div>
       </div>
     </header>
@@ -33,60 +34,82 @@ async function handleLogout() {
   min-height: 100vh;
   display: flex;
   flex-direction: column;
+  background: #f5f7fb;
 }
 
 .app-header {
-  height: var(--header-height);
-  background: var(--color-surface);
-  border-bottom: 1px solid var(--color-border);
+  background: #fff;
+  border-bottom: 1px solid #e4e7ec;
   position: sticky;
   top: 0;
   z-index: 100;
 }
 
 .app-header__inner {
-  max-width: var(--content-max-width);
+  max-width: 480px;
   margin: 0 auto;
-  height: 100%;
-  padding: 0 var(--space-4);
+  height: 56px;
+  padding: 0 16px;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: var(--space-3);
+  gap: 12px;
 }
 
 .app-header__logo {
   margin: 0;
-  font-size: var(--font-lg);
-  font-weight: 600;
-  color: var(--color-text);
-  letter-spacing: -0.02em;
+  font-size: 17px;
+  font-weight: 700;
+  color: #101828;
 }
 
 .app-header__actions {
   display: flex;
   align-items: center;
-  gap: var(--space-3);
+  gap: 8px;
+  min-width: 0;
+  flex-shrink: 0;
 }
 
 .app-header__user {
-  max-width: 120px;
+  max-width: 88px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  font-size: 13px;
+  color: #475467;
+}
+
+.app-header__sep {
+  font-size: 12px;
+  color: #d0d5dd;
+  user-select: none;
+}
+
+.app-header__logout {
+  border: none;
+  background: transparent;
+  color: #475467;
+  font-size: 13px;
+  padding: 6px 0;
+  cursor: pointer;
+}
+
+.app-header__logout:active {
+  background: #f1f5f9;
 }
 
 .app-main {
   flex: 1;
-  max-width: var(--content-max-width);
   width: 100%;
+  max-width: 480px;
   margin: 0 auto;
-  padding: var(--space-4);
+  padding: 16px;
 }
 
-@media (min-width: 769px) {
+@media (min-width: 481px) {
   .app-main {
-    padding: var(--space-6);
+    padding: 16px 20px 24px;
   }
 }
 </style>

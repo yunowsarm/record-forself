@@ -38,6 +38,8 @@ Authentication → Providers → Email → 启用
 
 该脚本会创建 `profiles`、`weekly_reports` 表、RLS 策略及注册时自动创建 profile 的 trigger。
 
+如需「全部周报」团队查看功能，还需执行 [`supabase/migrations/002_team_view.sql`](supabase/migrations/002_team_view.sql)。
+
 ### 4. 配置环境变量
 
 ```powershell
